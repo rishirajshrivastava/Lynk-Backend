@@ -13,7 +13,30 @@ app.post("/signup",async (req,res)=>{
     } catch (err) {
         res.status(500).send("Error saving user"+ err.message);
     }
-    
+})
+
+app.get("/feed",async(req,res)=>{
+    try {
+        const user = await User.find();
+        if(user.length === 0) {
+            return res.status(404).send("No users found");
+        }
+        res.send(user);
+    } catch (err) {
+        res.status(500).send("Error fetching users: " + err.message);
+    }
+})
+
+app.get("/user",async(req,res)=>{
+    try {
+        const user = await User.find({email: req.body.email});
+        if(user.length === 0) {
+            return res.status(404).send("No user found with this email");
+        }
+        res.send(user);
+    } catch (err) {
+        res.status(500).send("Error fetching users: " + err.message);
+    }
 })
 
 connectDB().then(()=>{
