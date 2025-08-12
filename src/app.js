@@ -35,7 +35,18 @@ app.get("/user",async(req,res)=>{
         }
         res.send(user);
     } catch (err) {
-        res.status(500).send("Error fetching users: " + err.message);
+        res.status(500).send("Error fetching users");
+    }
+})
+
+app.delete("/user",async(req,res)=>{
+    const userId = req.body.id;
+    console.log("User ID to delete:", userId);
+    try {
+        await User.findByIdAndDelete(userId);
+        res.send("User deleted successfully");
+    } catch (err) {
+        return res.status(500).send("Error deleting user");
     }
 })
 
