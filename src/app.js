@@ -53,10 +53,10 @@ app.delete("/user",async(req,res)=>{
 app.patch("/user", async(req,res)=>{
     const data = req.body;
     try {
-        await User.findByIdAndUpdate(data.id, data)
+        await User.findByIdAndUpdate(data.id, data, { runValidators: true });
         res.send("User updated successfully");
     } catch (err) {
-        return res.status(500).send("Error updating user");
+        return res.status(500).send("Error updating user" + err.message);
     }
 })
 
