@@ -8,10 +8,15 @@ app.use(express.json());
 app.post("/signup",async (req,res)=>{
     const user = new User(req.body);
     try{
+        const allowedParams = ["id", "firstName", "lastName", "password", "gender", "photoUrl", "about", "skills","email", "age"];
+        const isValidOperation = Object.keys(req.body).every((update) => allowedParams.includes(update));
+        if (!isValidOperation) {
+            throw new Error("User cannot be registered");
+        }
         await user.save();
         res.send("user added successfully");
     } catch (err) {
-        res.status(500).send("Error saving user"+ err.message);
+        res.status(500).send("Error saving user. "+ err.message);
     }
 })
 
@@ -39,8 +44,8 @@ app.get("/user",async(req,res)=>{
     }
 })
 
-app.delete("/user",async(req,res)=>{
-    const userId = req.body.id;
+app.delete("/user/:id",async(req,res)=>{
+    const userId = req.params.id;
     console.log("User ID to delete:", userId);
     try {
         await User.findByIdAndDelete(userId);
@@ -50,13 +55,21 @@ app.delete("/user",async(req,res)=>{
     }
 })
 
-app.patch("/user", async(req,res)=>{
+app.patch("/user/:userId", async(req,res)=>{
     const data = req.body;
     try {
-        await User.findByIdAndUpdate(data.id, data, { runValidators: true });
+        const allowedUpdates = ["firstName", "lastName", "password", "gender", "photoUrl", "about", "skills"];
+    const isValidOperation = Object.keys(data).every((update) => allowedUpdates.includes(update));
+    if (!isValidOperation) {
+        throw new error("Update not allowed");
+    }
+    if(data?.skills?.length > 10 ) {
+        throw new Error("Skills cannot be more than 10");
+    }
+        await User.findByIdAndUpdate(req.params?.userId, data, { runValidators: true });
         res.send("User updated successfully");
     } catch (err) {
-        return res.status(500).send("Error updating user" + err.message);
+        return res.status(500).send("Error updating user. " + err.message);
     }
 })
 
