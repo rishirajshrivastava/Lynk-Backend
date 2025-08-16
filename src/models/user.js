@@ -1,5 +1,7 @@
 const mongoose = require('mongoose');
 const validator = require('validator');
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 const userSchema = new mongoose.Schema({
     firstName: {
         type: String,
@@ -24,15 +26,6 @@ const userSchema = new mongoose.Schema({
         type: String,
         required: true,
         minlength: 6,
-        validate(value) {
-            const hasLowercase = /[a-z]/.test(value);
-            const hasUppercase = /[A-Z]/.test(value);
-            const hasDigit = /\d/.test(value);
-            const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(value);
-            if (!(hasLowercase && hasUppercase && hasDigit && hasSpecial)) {
-                throw new Error("Password must contain at least one lowercase letter, one uppercase letter, one digit, and one special character");
-            }
-        }
     },
     age: {
         type: Number,
@@ -73,5 +66,17 @@ const userSchema = new mongoose.Schema({
         }
     }
 }, {timestamps: true});
+
+userSchema.methods.getJWT = async function() {
+    const user = this;
+    const token = await jwt.sign({_id: user._id},"Dev@1608",{ expiresIn: "7d"});
+    return token;
+};
+
+userSchema.methods.validatePassword = async function(password, encryptedPassword) {
+    const isPasswordValid = await bcrypt.compare(password, encryptedPassword);
+    return isPasswordValid;
+
+}
 
 module.exports = mongoose.model("User", userSchema);

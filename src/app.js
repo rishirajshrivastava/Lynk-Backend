@@ -4,14 +4,22 @@ const User = require('./models/user');
 const app = express();
 const bcrypt = require('bcrypt');
 const validator = require('validator');
+const cookieParser = require('cookie-parser');
+const jwt = require('jsonwebtoken');
+const checkPasswordStrength = require('./utils/checkPasswordStrength');
+const userAuth = require('./middlewares/auth');
 
 app.use(express.json());
+app.use(cookieParser());
 
 app.post("/signup",async (req,res)=>{
     // ENCRYPT THE PASSWORD
     const {firstName,lastName,email,password,age,about,gender,skills,photoUrl} = req.body;
+    const errors= checkPasswordStrength(password);
+    if (errors.length > 0) {
+        return res.status(400).send("Password must contain: " + errors.join(", "));
+    }
     const passwordHash = await bcrypt.hash(password, 10);
-    console.log("Password Hash:", passwordHash);
     const user = new User({
         firstName,
         lastName,
@@ -42,14 +50,19 @@ app.post("/login",async (req,res)=>{
         if(!validator.isEmail(email)) {
             throw new Error("Invalid email");
         }
-        const user = await (User.find({email: req.body.email}))
+        const user = await (User.findOne({email: req.body.email}));
         if(!user || user.length === 0) {
             throw new Error("Invalid credentials");
-        }else {
-            const encryptedPassword = user[0].password;
-            const isPasswordValid = await bcrypt.compare(password, encryptedPassword);
+        } else {
+            const encryptedPassword = user.password;
+            const isPasswordValid = await user.validatePassword(password, encryptedPassword);
             if(!isPasswordValid) {
                 throw new Error("Invalid credentials");
+            }
+            if(isPasswordValid) {
+                //create jwt token, attach it to cookie and send the resposne back to user
+                const token =  await user.getJWT();
+                res.cookie("token", token);
             }
             res.send("User logged in successfully");
         }
@@ -58,57 +71,18 @@ app.post("/login",async (req,res)=>{
     }
 });
 
-app.get("/feed",async(req,res)=>{
-    try {
-        const user = await User.find();
-        if(user.length === 0) {
-            return res.status(404).send("No users found");
-        }
-        res.send(user);
+app.get("/profile", userAuth, async (req,res)=>{
+    try{
+        res.send(req.user);
     } catch (err) {
-        res.status(500).send("Error fetching users: " + err.message);
+        res.status(500).send("ERROR : " + err.message);
     }
-})
+    
+});
 
-app.get("/user",async(req,res)=>{
-    try {
-        const user = await User.find({email: req.body.email});
-        if(user.length === 0) {
-            return res.status(404).send("No user found with this email");
-        }
-        res.send(user);
-    } catch (err) {
-        res.status(500).send("Error fetching users");
-    }
-})
-
-app.delete("/user/:id",async(req,res)=>{
-    const userId = req.params.id;
-    console.log("User ID to delete:", userId);
-    try {
-        await User.findByIdAndDelete(userId);
-        res.send("User deleted successfully");
-    } catch (err) {
-        return res.status(500).send("Error deleting user");
-    }
-})
-
-app.patch("/user/:userId", async(req,res)=>{
-    const data = req.body;
-    try {
-        const allowedUpdates = ["firstName", "lastName", "password", "gender", "photoUrl", "about", "skills"];
-    const isValidOperation = Object.keys(data).every((update) => allowedUpdates.includes(update));
-    if (!isValidOperation) {
-        throw new error("Update not allowed");
-    }
-    if(data?.skills?.length > 10 ) {
-        throw new Error("Skills cannot be more than 10");
-    }
-        await User.findByIdAndUpdate(req.params?.userId, data, { runValidators: true });
-        res.send("User updated successfully");
-    } catch (err) {
-        return res.status(500).send("Error updating user. " + err.message);
-    }
+app.post("/sendConnectionRequest", userAuth,  async (req, res) => {
+    const user = req.user;
+    res.send(user.firstName + " is sending a connection request ");
 })
 
 connectDB().then(()=>{
