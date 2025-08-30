@@ -262,4 +262,50 @@ requestRouter.get("/reminder/status/:toUserId", userAuth, async (req, res) => {
     }
 });
 
+requestRouter.get("/reminders/pending", userAuth, async (req, res) => {
+    try {
+        const loggedInUser = req.user._id;
+        
+        const pendingReminders = await ConnectionRequest.find({
+            toUserId: loggedInUser,
+            saved: true,
+            reminderSent: true,
+            reminderReviewed: false,
+            status: 'interested'
+        }).populate('fromUserId', USER_SAFE_DATA);
+
+        if (pendingReminders.length === 0) {
+            return res.json({
+                message: "No pending reminders found",
+                data: []
+            });
+        }
+
+        // If there is data, directly return all users' data
+        const usersData = pendingReminders.map(request => ({
+            _id: request._id,
+            firstName: request.fromUserId.firstName,
+            lastName: request.fromUserId.lastName,
+            photoUrl: request.fromUserId.photoUrl,
+            age: request.fromUserId.age,
+            gender: request.fromUserId.gender,
+            about: request.fromUserId.about,
+            skills: request.fromUserId.skills,
+            updatedAt: request.updatedAt
+        }));
+
+        res.json({
+            message: "Pending reminders retrieved successfully",
+            data: usersData
+        });
+
+    } catch (err) {
+        console.error("Fetch pending reminders error:", err);
+        res.status(500).json({ 
+            message: "Failed to fetch pending reminders",
+            error: err.message 
+        });
+    }
+});
+
 module.exports = requestRouter;
