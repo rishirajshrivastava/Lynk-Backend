@@ -14,10 +14,22 @@ const connectionRequestSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum:{
-            values: ['ignored', 'interested', 'accepted', 'rejected'],
+            values: ['ignored', 'interested', 'accepted', 'rejected','special-like'],
             message: `{VALUE} is not a valid status`
         },
     },
+    saved: {
+        type: Boolean,
+        default: false
+    },
+    reminderSent: {
+        type: Boolean,
+        default: false
+    },
+    reminderReviewed: {
+        type: Boolean,
+        default: false
+    }
 },
 {timestamps: true});
 

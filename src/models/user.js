@@ -34,23 +34,18 @@ const userSchema = new mongoose.Schema({
     gender: {
         type: String,
         validate(value) {
-            if(!["male","female","others"].includes(value)){
+            if(!["male","female","other","prefer-not-to-say"].includes(value)){
                 throw new Error("Gender must be either male female or others")
             }
         }
     },
     photoUrl: {
         type: String,
-        default: "https://media.licdn.com/dms/image/v2/D4D03AQHaI_6uAY-Bow/profile-displayphoto-shrink_200_200/profile-displayphoto-shrink_200_200/0/1675358757547?e=2147483647&v=beta&t=VX9A6jEjn9CsYzvXlJeDCiqml29FiVMwY2-F8kY23sA",
-        validate(value) {
-            if(!validator.isURL(value)) {
-                throw new Error("URL is not valid " + value);
-            }
-        }
+        default: "https://images.pexels.com/photos/1525041/pexels-photo-1525041.jpeg?_gl=1*m22qk3*_ga*NjExODkyMTU5LjE3NTYyMTA0MjA.*_ga_8JE65Q40S6*czE3NTYyMTA0MjAkbzEkZzEkdDE3NTYyMTA0MzEkajQ5JGwwJGgw",
     },
     about: {
         type: String,
-        default: "this is a default about of the user"
+        default: ""
     },
     skills: {
         type: [String],
@@ -63,6 +58,18 @@ const userSchema = new mongoose.Schema({
             if (uniqueSkills.size !== value.length) {
                 throw new Error("Skills cannot be duplicate");
             }
+        }
+    },
+    specialLikeCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 5,
+        validate: {
+            validator: function(value) {
+                return value >= 0 && value <= 5;
+            },
+            message: 'Special like count must be between 0 and 5'
         }
     }
 }, {timestamps: true});

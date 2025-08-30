@@ -6,7 +6,7 @@ const userAuth = require('../middlewares/auth');
 
 profileRouter.get("/profile/view", userAuth, async (req,res)=>{
     try{
-        res.send(req.user);
+        res.json({"user": req.user});
     } catch (err) {
         res.status(500).send("ERROR : " + err.message);
     }
@@ -18,7 +18,6 @@ profileRouter.patch("/profile/edit", userAuth, async (req,res)=>{
             res.status(400).send("Invalid edit request");
         }
         const loggedInUser = req.user;
-        console.log(loggedInUser);
         
         Object.keys(req.body).forEach((field) => {
             loggedInUser[field] = req.body[field]
