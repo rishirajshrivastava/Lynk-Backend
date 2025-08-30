@@ -66,9 +66,9 @@ requestRouter.post("/request/send/:status/:toUserId", userAuth,  async (req, res
 
 requestRouter.post("/request/review/:status/:requestId", userAuth, async(req,res,next) => {
     try {
-        console.log('dfgbfeibgeg');
         const loggedInUser = req.user;
         const {status , requestId} = req.params
+        const { reminderReviewed } = req.query;
 
         const allowedStatus = ['accepted', 'rejected'];
         if(status === 'special-like') {
@@ -86,6 +86,9 @@ requestRouter.post("/request/review/:status/:requestId", userAuth, async(req,res
             return res.status(404).json({"message" : "Connection request not found"});
         }
         connectionRequest.status = status;
+        if (reminderReviewed === 'true') {
+            connectionRequest.reminderReviewed = true;
+        }
         const data = await connectionRequest.save();
 
         res.json({
@@ -305,6 +308,76 @@ requestRouter.get("/reminders/pending", userAuth, async (req, res) => {
             message: "Failed to fetch pending reminders",
             error: err.message 
         });
+    }
+});
+
+requestRouter.post("/reminder/review/:connectionId", userAuth, async (req, res) => {
+    try {
+
+        const { connectionId } = req.params;
+        
+
+        const connectionRequest = await ConnectionRequest.findOne({
+            _id: connectionId,
+            status: 'interested',
+            saved: true,    
+            reminderSent: true,  
+            reminderReviewed: false
+        });
+
+
+        if (!connectionRequest) {
+            return res.status(404).json({
+                message: "No matching connection request found",                
+            });
+        }
+
+        const updatedRequest = await ConnectionRequest.findByIdAndUpdate(
+            connectionRequest._id,
+            { reminderReviewed: true },
+        );
+
+        res.json({
+            message: "Reminder marked as reviewed successfully",
+            data: {
+                requestId: updatedRequest._id,
+                fromUserId: updatedRequest.fromUserId,
+                toUserId: updatedRequest.toUserId,
+            }
+        });
+
+    } catch (err) {
+        console.error("Mark reminder reviewed error:", err);
+        res.status(500).json({ 
+            message: "Failed to mark reminder as reviewed",
+            error: err.message 
+        });
+    }
+});
+
+requestRouter.get("/request/status/:toUserId" , userAuth, async (req, res) => {
+    try {
+        const { toUserId } = req.params;
+        const fromUserId = req.user._id;
+
+        const connectionRequest = await ConnectionRequest.findOne({
+            fromUserId: fromUserId,
+            toUserId: toUserId
+        });
+        if (!connectionRequest) {
+            return res.json({
+                message: "No connection request found",
+                data: null
+            });
+        }
+        res.json({
+            message: "Connection request status retrieved",
+            data: {
+                status: connectionRequest.status,
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
     }
 });
 
