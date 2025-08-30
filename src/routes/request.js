@@ -190,4 +190,76 @@ requestRouter.get("/user/saved-profiles", userAuth, async (req, res) => {
     }
 });
 
+requestRouter.post("/request/reminder/:toUserId", userAuth, async (req, res) => {
+    try {
+        const { toUserId } = req.params;
+        
+        // Find the connection request
+        const connectionRequest = await ConnectionRequest.findOne({
+            fromUserId: req.user._id,
+            toUserId: toUserId
+        });
+
+        if (!connectionRequest) {
+            return res.status(404).json({
+                message: "Connection request not found"
+            });
+        }
+
+        // Check if reminder is already sent
+        if (connectionRequest.reminderSent === true) {
+            return res.status(400).json({
+                message: "Reminder is already sent",
+                data: {
+                    reminderSent: true,
+                    message: "Cannot send reminder again",                    
+                }
+            });
+        }
+
+        // Update reminderSent to true
+        const updatedRequest = await ConnectionRequest.findByIdAndUpdate(
+            connectionRequest._id,
+            { reminderSent: true },
+            { new: true }
+        );
+
+        res.json({
+            message: "Reminder sent successfully",
+        });
+
+    } catch (err) {
+        console.error("Update reminder error:", err);
+        res.status(500).json({ message: err.message });
+    }
+});
+
+requestRouter.get("/reminder/status/:toUserId", userAuth, async (req, res) => {
+    try {
+        const { toUserId } = req.params;
+        
+        // Find the connection request
+        const connectionRequest = await ConnectionRequest.findOne({
+            fromUserId: req.user._id,
+            toUserId: toUserId
+        });
+
+        if (!connectionRequest) {
+            return res.status(404).json({
+                message: "Connection request not found"
+            });
+        }
+
+        res.json({
+            message: "Reminder status retrieved successfully",
+            data: {
+                reminderSent: connectionRequest.reminderSent,
+            }
+        });
+
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
 module.exports = requestRouter;
