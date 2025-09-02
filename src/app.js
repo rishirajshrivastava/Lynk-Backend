@@ -21,7 +21,9 @@ app.use("/", authRouter, profileRouter, requestRouter, userRouter);
 connectDB().then(()=>{
     console.log('Connected to database');
     app.listen(3000, () => {    
-});
+}).then(()=>{
+    console.log('Server is running on port 3000');
 }).catch(err=>{
     console.log('Error connecting to database:', err);
-})
+});
+});
