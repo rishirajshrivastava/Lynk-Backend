@@ -19,6 +19,7 @@ const userRouter = require('./routes/user');
 app.use("/", authRouter, profileRouter, requestRouter, userRouter);
 
 connectDB().then(()=>{
+    console.log('Connected to database');
     app.listen(3000, () => {    
 });
 }).catch(err=>{
