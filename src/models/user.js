@@ -71,8 +71,23 @@ const userSchema = new mongoose.Schema({
             },
             message: 'Special like count must be between 0 and 5'
         }
+    },
+    dayLikesCount: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 8,
+        validate: {
+            validator: function(value) {
+                return value >= 0 && value <= 8;
+            },
+            message: 'Day likes count must be between 0 and 8'
+        }
     }
 }, {timestamps: true});
+
+// Index for efficient cron job queries
+userSchema.index({ dayLikesCount: 1, _id: 1 });
 
 userSchema.methods.getJWT = async function() {
     const user = this;

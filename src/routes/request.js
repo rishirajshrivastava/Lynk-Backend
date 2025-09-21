@@ -22,12 +22,11 @@ requestRouter.post("/request/send/:status/:toUserId", userAuth,  async (req, res
         }
 
         const allowedStatus = ['ignored', 'interested'];
-        console.log(status)
         if(status === 'special-like') {
             return next(); // Pass to the next handler for special-like
         }
         if (!allowedStatus.includes(status)) {
-            return res.status(400).json({"message" : "Invalid status typebbbbb: " + status});
+            return res.status(400).json({"message" : "Invalid status type: " + status});
         }
 
         //if there is an existing connection request
@@ -47,13 +46,32 @@ requestRouter.post("/request/send/:status/:toUserId", userAuth,  async (req, res
             toUserId,
             status
         });
-        const data = await connectionRequest.save();
+        // Handle interested status with validation and counter increment
         if(status === 'interested') {
+            // Check dayLikesCount limit before saving connection request
+            const currentUser = await User.findById(fromUserId);
+            if (currentUser.dayLikesCount >= 8) {
+                return res.status(400).json({
+                    message: "You have reached the maximum like limit per day."
+                });
+            }
+            
+            // Save connection request
+            const data = await connectionRequest.save();
+            
+            // Increment dayLikesCount
+            await User.findByIdAndUpdate(fromUserId, {
+                $inc: { dayLikesCount: 1 }
+            });
+            
             res.json({
                 message: req.user.firstName + " is " + status + " in " + toUser.firstName,
                 data: data
             });
-        } else if( status === 'ignored') {
+        } else if(status === 'ignored') {
+            // Save connection request for ignored status
+            const data = await connectionRequest.save();
+            
             res.json({
                 message: req.user.firstName + " has " + status + " " + toUser.firstName,
                 data: data
@@ -106,8 +124,7 @@ requestRouter.post("/request/send/special-like/:userId", userAuth, async (req, r
     try {
         const fromUserId = req.user._id;
         const toUserId = req.params.userId;
-
-        console.log(fromUserId);  
+  
 
         // Check if user has special likes remaining
         const currentUser = await User.findById(fromUserId);
@@ -181,7 +198,6 @@ requestRouter.get("/user/saved-profiles", userAuth, async (req, res) => {
             saved: true
         }).populate('toUserId', USER_SAFE_DATA);
 
-        console.log(fromUserId);
 
         const savedProfiles = savedRequests.map(req => req.toUserId);
 
