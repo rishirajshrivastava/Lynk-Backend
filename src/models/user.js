@@ -64,12 +64,12 @@ const userSchema = new mongoose.Schema({
         type: Number,
         default: 0,
         min: 0,
-        max: 5,
+        max: 3,
         validate: {
             validator: function(value) {
-                return value >= 0 && value <= 5;
+                return value >= 0 && value <= 3;
             },
-            message: 'Special like count must be between 0 and 5'
+            message: 'Special like count must be between 0 and 3'
         }
     },
     dayLikesCount: {

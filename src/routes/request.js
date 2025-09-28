@@ -93,7 +93,7 @@ requestRouter.post("/request/review/:status/:requestId", userAuth, async(req,res
             return next(); // Pass to the next handler for special-like
         }
         if(!allowedStatus.includes(status)) {
-            return res.status(400).json({"message" : "Invalid status typeaaaa: " + req.params.status});
+            return res.status(400).json({"message" : "Invalid status type: " + req.params.status});
         }
         const connectionRequest = await ConnectionRequest.findOne({
             _id: requestId,
@@ -116,8 +116,6 @@ requestRouter.post("/request/review/:status/:requestId", userAuth, async(req,res
     catch (err) {
         res.status(400).send("Error : " + err.message);
     }
-    
-
 })
 
 requestRouter.post("/request/send/special-like/:userId", userAuth, async (req, res) => {
@@ -128,9 +126,9 @@ requestRouter.post("/request/send/special-like/:userId", userAuth, async (req, r
 
         // Check if user has special likes remaining
         const currentUser = await User.findById(fromUserId);
-        if (currentUser.specialLikeCount >= 5) {
+        if (currentUser.specialLikeCount >= 3) {
             return res.status(400).json({
-                message: "You have reached the maximum limit of 5 special likes"
+                message: "You have reached the maximum limit of 3 special likes"
             });
         }
 
