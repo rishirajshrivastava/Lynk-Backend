@@ -6,33 +6,94 @@ const validator = require('validator');
 const checkPasswordStrength = require('../utils/checkPasswordStrength');
 
 authRouter.post("/signup",async (req,res)=>{
-    // ENCRYPT THE PASSWORD
-    const {firstName,lastName,email,password,age,about,gender,skills,photoUrl} = req.body;
-    if (Array.isArray(skills) && skills.length > 6) {
-        return res.status(400).json({ message: "You can add a maximum of 6 skills." });
+    const {
+        firstName, lastName, email, password, age, dateOfBirth, gender, interestedIn,
+        height, weight, bodyType, ethnicity,
+        religion, politicalViews, phoneNumber,
+        location, distancePreference, occupation, education, income, smoking, drinking, exercise, diet,
+        relationshipStatus, lookingFor, hasKids, wantsKids, zodiacSign,
+        about, interests, hobbies, languages, photoUrl
+    } = req.body;
+
+    if (!firstName || !email || !password || !gender) {
+        return res.status(400).json({ 
+            error: "Missing required fields",
+            details: "First name, email, password, and gender are required"
+        });
     }
-    const errors= checkPasswordStrength(password);
+
+    // Validate skills/interests array length
+    if (Array.isArray(interests) && interests.length > 20) {
+        return res.status(400).json({ message: "You can add a maximum of 20 interests." });
+    }
+    if (Array.isArray(hobbies) && hobbies.length > 15) {
+        return res.status(400).json({ message: "You can add a maximum of 15 hobbies." });
+    }
+    if (Array.isArray(languages) && languages.length > 10) {
+        return res.status(400).json({ message: "You can add a maximum of 10 languages." });
+    }
+    if (Array.isArray(photoUrl) && photoUrl.length > 6) {
+        return res.status(400).json({ message: "You can add a maximum of 6 photos." });
+    }
+
+    const errors = checkPasswordStrength(password);
     if (errors.length > 0) {
         return res.status(400).json({
-        error: "Weak Password",
-        details: "Password must contain: " + errors.join(", ")
-    });
-
+            error: "Weak Password",
+            details: "Password must contain: " + errors.join(", ")
+        });
     }
     const passwordHash = await bcrypt.hash(password, 10);
-    const user = new User({
+    
+    const userData = {
         firstName,
         lastName,
         email,
         password: passwordHash,
-        age,
         gender,
-        photoUrl,
-        about,
-        skills
-    });
+        interestedIn: interestedIn || ["everyone"],
+        photoUrl: photoUrl || []
+    };
+
+    // Add optional fields only if they exist
+    if (age) userData.age = age;
+    if (dateOfBirth) userData.dateOfBirth = new Date(dateOfBirth);
+    if (height) userData.height = height;
+    if (weight) userData.weight = weight;
+    if (bodyType) userData.bodyType = bodyType;
+    if (ethnicity) userData.ethnicity = ethnicity;
+    if (religion) userData.religion = religion;
+    if (politicalViews) userData.politicalViews = politicalViews;
+    if (phoneNumber) userData.phoneNumber = phoneNumber;
+    if (location) userData.location = location;
+    if (distancePreference) userData.distancePreference = distancePreference;
+    if (occupation) userData.occupation = occupation;
+    if (education) userData.education = education;
+    if (income) userData.income = income;
+    if (smoking) userData.smoking = smoking;
+    if (drinking) userData.drinking = drinking;
+    if (exercise) userData.exercise = exercise;
+    if (diet) userData.diet = diet;
+    if (relationshipStatus) userData.relationshipStatus = relationshipStatus;
+    if (lookingFor) userData.lookingFor = lookingFor;
+    if (hasKids) userData.hasKids = hasKids;
+    if (wantsKids) userData.wantsKids = wantsKids;
+    if (zodiacSign) userData.zodiacSign = zodiacSign;
+    if (about) userData.about = about;
+    if (interests) userData.interests = interests;
+    if (hobbies) userData.hobbies = hobbies;
+    if (languages) userData.languages = languages;
+
+    const user = new User(userData);
+    
     try{
-        const allowedParams = ["id", "firstName", "lastName", "password", "gender", "photoUrl", "about", "skills","email", "age"];
+        const allowedParams = [
+            "firstName", "lastName", "email", "password", "age", "dateOfBirth", "gender", "interestedIn",
+            "height", "weight", "bodyType", "ethnicity", "religion", "politicalViews", "phoneNumber",
+            "location", "distancePreference", "occupation", "education", "income", "smoking", "drinking", 
+            "exercise", "diet", "relationshipStatus", "lookingFor", "hasKids", "wantsKids", "zodiacSign",
+            "about", "interests", "hobbies", "languages", "photoUrl"
+        ];
         const isValidOperation = Object.keys(req.body).every((update) => allowedParams.includes(update));
         if (!isValidOperation) {
             throw new Error("User cannot be registered");
