@@ -40,8 +40,20 @@ const userSchema = new mongoose.Schema({
         }
     },
     photoUrl: {
+        type: [String],
+        default: [],
+    },
+    clickedPhoto : {
         type: String,
-        default: "https://images.pexels.com/photos/1525041/pexels-photo-1525041.jpeg?_gl=1*m22qk3*_ga*NjExODkyMTU5LjE3NTYyMTA0MjA.*_ga_8JE65Q40S6*czE3NTYyMTA0MjAkbzEkZzEkdDE3NTYyMTA0MzEkajQ5JGwwJGgw",
+        default: "",
+    },
+    verified : {
+        type: Boolean,
+        default: false,
+    },
+    verificationInProgress : {
+        type: Boolean,
+        default: false,
     },
     about: {
         type: String,
