@@ -160,11 +160,19 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload(), async (req, res) 
         if (uploadResults.length > 0) {
             const photoUrls = uploadResults.map(result => result.photoUrl);
             
-            if (photoArray.length === 1) {
-                await User.findByIdAndUpdate(loggedInUser._id, { photoUrl: photoUrls[0] });
-            } else {
-                await User.findByIdAndUpdate(loggedInUser._id, { photos: photoUrls });
-            }
+            // Update database to keep it in sync with S3
+            // Get current user's photos and add new ones
+            const user = await User.findById(loggedInUser._id);
+            const currentPhotos = user.photoUrl || [];
+            
+            // Add new photo URLs to existing ones
+            const updatedPhotos = [...currentPhotos, ...photoUrls];
+            
+            // Update the database with all photos (existing + new)
+            await User.findByIdAndUpdate(
+                loggedInUser._id, 
+                { photoUrl: updatedPhotos }
+            );
         }
 
         const isSinglePhoto = photoArray.length === 1;
@@ -200,15 +208,28 @@ userRouter.delete("/user/delete-photo", userAuth, async (req, res) => {
             return res.status(400).json({ message: "Photo URL is required" });
         }
 
+        // First, check if photo exists in database (source of truth)
+        const user = await User.findById(loggedInUser._id);
+        if (!user || !user.photoUrl || !user.photoUrl.includes(photoUrl)) {
+            return res.status(404).json({ 
+                message: "Photo not found in database",
+                photoUrl: photoUrl
+            });
+        }
+
         // Extract the key from the photo URL
         const urlParts = photoUrl.split('/');
         const key = urlParts.slice(3).join('/'); // Remove the domain parts
 
-        // Delete from S3
-        const { deleteObject } = require('../utils/deleteObject');
-        await deleteObject(key);
+        // Try to delete from S3 (but don't fail if it doesn't exist there)
+        try {
+            const { deleteObject } = require('../utils/deleteObject');
+            await deleteObject(key);
+        } catch (s3Error) {
+            console.warn(`Photo not found in S3, but continuing with database deletion: ${s3Error.message}`);
+        }
 
-        // Update user's photoUrl array in database
+        // Update user's photoUrl array in database (source of truth)
         await User.findByIdAndUpdate(
             loggedInUser._id, 
             { $pull: { photoUrl: photoUrl } }
@@ -229,48 +250,40 @@ userRouter.delete("/user/delete-all-photos", userAuth, async (req, res) => {
     try {
         const loggedInUser = req.user;
 
-        // Get all photos from S3 for this user
-        const { countUserPhotos } = require('../utils/countPhotos');
-        const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
-        const { s3Client } = require('../utils/s3-credentials');
-
-        // List all objects in the user's folder
-        const params = {
-            Bucket: process.env.AWS_S3_BUCKET,
-            Prefix: `users/${loggedInUser._id}/`,
-        };
-
-        const command = new ListObjectsV2Command(params);
-        const response = await s3Client.send(command);
-        
-        if (!response.Contents || response.Contents.length === 0) {
-            return res.status(400).json({ message: "No photos found to delete" });
+        // First, check if user has photos in database (source of truth)
+        const user = await User.findById(loggedInUser._id);
+        if (!user || !user.photoUrl || user.photoUrl.length === 0) {
+            return res.status(400).json({ message: "No photos found in database to delete" });
         }
 
-        // Filter only image files and get their keys
-        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        const imageKeys = response.Contents
-            .filter(obj => {
-                const key = obj.Key.toLowerCase();
-                return imageExtensions.some(ext => key.endsWith(ext));
-            })
-            .map(obj => obj.Key);
+        // Get photo URLs from database (source of truth)
+        const photoUrls = user.photoUrl;
+        const deletedKeys = [];
+        const s3Errors = [];
 
-        if (imageKeys.length === 0) {
-            return res.status(400).json({ message: "No image files found to delete" });
+        // Try to delete each photo from S3
+        for (const photoUrl of photoUrls) {
+            try {
+                const urlParts = photoUrl.split('/');
+                const key = urlParts.slice(3).join('/');
+                
+                const { deleteObject } = require('../utils/deleteObject');
+                await deleteObject(key);
+                deletedKeys.push(key);
+            } catch (s3Error) {
+                console.warn(`Photo not found in S3: ${photoUrl} - ${s3Error.message}`);
+                s3Errors.push({ photoUrl, error: s3Error.message });
+            }
         }
 
-        // Delete all photos from S3
-        const { deleteObjects } = require('../utils/deleteObject');
-        const deleteResult = await deleteObjects(imageKeys);
-
-        // Clear all photos from user's database record
+        // Clear all photos from user's database record (source of truth)
         await User.findByIdAndUpdate(loggedInUser._id, { photoUrl: [] });
 
         res.json({
             message: "All photos deleted successfully",
-            deletedCount: deleteResult.deletedCount,
-            deletedKeys: deleteResult.deletedKeys,
+            deletedFromDatabase: photoUrls.length,
+            deletedFromS3: deletedKeys.length,
+            s3Errors: s3Errors.length > 0 ? s3Errors : undefined,
             userId: loggedInUser._id
         });
     } catch (err) {
@@ -307,7 +320,19 @@ userRouter.put("/user/edit-photo", userAuth, fileUpload(), async (req, res) => {
         const { deleteObject } = require('../utils/deleteObject');
         await deleteObject(oldKey);
 
-        // No database operations - only S3 operations
+        // Update database to keep it in sync with S3
+        // Get current user's photos and replace the old URL with new one
+        const user = await User.findById(loggedInUser._id);
+        if (user && user.photoUrl) {
+            const updatedPhotos = user.photoUrl.map(url => 
+                url === oldPhotoUrl ? newPhotoUrl : url
+            );
+            
+            await User.findByIdAndUpdate(
+                loggedInUser._id,
+                { photoUrl: updatedPhotos }
+            );
+        }
 
         res.json({
             message: "Photo updated successfully",
@@ -325,49 +350,23 @@ userRouter.get("/user/photos", userAuth, async (req, res) => {
     try {
         const loggedInUser = req.user;
         
-        // Get photos directly from S3
-        const { ListObjectsV2Command } = require('@aws-sdk/client-s3');
-        const { s3Client } = require('../utils/s3-credentials');
-
-        // List all objects in the user's folder
-        const params = {
-            Bucket: process.env.AWS_S3_BUCKET,
-            Prefix: `users/${loggedInUser._id}/`,
-        };
-
-        const command = new ListObjectsV2Command(params);
-        const response = await s3Client.send(command);
-        
-        if (!response.Contents || response.Contents.length === 0) {
-            return res.json({
-                message: "No photos found",
-                photos: [],
-                photoCount: 0,
-                userId: loggedInUser._id
-            });
+        const user = await User.findById(loggedInUser._id).select('photoUrl');
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
         }
 
-        // Filter only image files and generate URLs
-        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.webp'];
-        const photos = response.Contents
-            .filter(obj => {
-                const key = obj.Key.toLowerCase();
-                return imageExtensions.some(ext => key.endsWith(ext));
-            })
-            .map(obj => {
-                const photoUrl = `https://${process.env.AWS_S3_BUCKET}.s3.${process.env.AWS_REGION}.amazonaws.com/${obj.Key}`;
-                return {
-                    key: obj.Key,
-                    url: photoUrl,
-                    lastModified: obj.LastModified,
-                    size: obj.Size
-                };
-            });
+        const photoUrls = user.photoUrl || [];
+        
+        const photos = photoUrls.map((url, index) => ({
+            index: index,
+            url: url,
+            filename: url.split('/').pop()
+        }));
 
         res.json({
             message: "Photos retrieved successfully",
-            photos: photos,
             photoCount: photos.length,
+            photos: photos,
             userId: loggedInUser._id
         });
     } catch (err) {
