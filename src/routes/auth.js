@@ -36,13 +36,13 @@ authRouter.post("/signup",async (req,res)=>{
         return res.status(400).json({ message: "You can add a maximum of 6 photos." });
     }
 
-    const errors = checkPasswordStrength(password);
-    if (errors.length > 0) {
-        return res.status(400).json({
-            error: "Weak Password",
-            details: "Password must contain: " + errors.join(", ")
-        });
-    }
+    // const errors = checkPasswordStrength(password);
+    // if (errors.length > 0) {
+    //     return res.status(400).json({
+    //         error: "Weak Password",
+    //         details: "Password must contain: " + errors.join(", ")
+    //     });
+    // }
     const passwordHash = await bcrypt.hash(password, 10);
     
     const userData = {

@@ -4,10 +4,11 @@ const ConnectionRequest = require('../models/connectionRequest');
 const User = require('../models/user');
 
 const userAuth = require('../middlewares/auth');
+const verifyUser = require('../middlewares/verify');
 
 const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills";
 
-requestRouter.post("/request/send/:status/:toUserId", userAuth,  async (req, res, next) => {
+requestRouter.post("/request/send/:status/:toUserId", userAuth, verifyUser,  async (req, res, next) => {
     try {
         const fromUserId = req.user._id;
         const toUserId = req.params.toUserId;
@@ -82,7 +83,7 @@ requestRouter.post("/request/send/:status/:toUserId", userAuth,  async (req, res
     }
 })
 
-requestRouter.post("/request/review/:status/:requestId", userAuth, async(req,res,next) => {
+requestRouter.post("/request/review/:status/:requestId", userAuth, verifyUser, async(req,res,next) => {
     try {
         const loggedInUser = req.user;
         const {status , requestId} = req.params
@@ -118,7 +119,7 @@ requestRouter.post("/request/review/:status/:requestId", userAuth, async(req,res
     }
 })
 
-requestRouter.post("/request/send/special-like/:userId", userAuth, async (req, res) => {
+requestRouter.post("/request/send/special-like/:userId", userAuth, verifyUser, async (req, res) => {
     try {
         const fromUserId = req.user._id;
         const toUserId = req.params.userId;
@@ -173,7 +174,7 @@ requestRouter.post("/request/send/special-like/:userId", userAuth, async (req, r
 });
 
 // Get user's special like count
-requestRouter.get("/user/special-likes", userAuth, async (req, res) => {
+requestRouter.get("/user/special-likes", userAuth, verifyUser, async (req, res) => {
     try {
         const user = await User.findById(req.user._id).select('specialLikeCount');
         res.json({
@@ -188,7 +189,7 @@ requestRouter.get("/user/special-likes", userAuth, async (req, res) => {
 });
 
 // Get saved profiles (profiles user liked with ✨)
-requestRouter.get("/user/saved-profiles", userAuth, async (req, res) => {
+requestRouter.get("/user/saved-profiles", userAuth, verifyUser, async (req, res) => {
     try {
         const fromUserId = req.user._id;
         const savedRequests = await ConnectionRequest.find({
@@ -207,7 +208,7 @@ requestRouter.get("/user/saved-profiles", userAuth, async (req, res) => {
     }
 });
 
-requestRouter.post("/request/reminder/:toUserId", userAuth, async (req, res) => {
+requestRouter.post("/request/reminder/:toUserId", userAuth, verifyUser, async (req, res) => {
     try {
         const { toUserId } = req.params;
         
@@ -251,7 +252,7 @@ requestRouter.post("/request/reminder/:toUserId", userAuth, async (req, res) => 
     }
 });
 
-requestRouter.get("/reminder/status/:toUserId", userAuth, async (req, res) => {
+requestRouter.get("/reminder/status/:toUserId", userAuth, verifyUser, async (req, res) => {
     try {
         const { toUserId } = req.params;
         
@@ -279,7 +280,7 @@ requestRouter.get("/reminder/status/:toUserId", userAuth, async (req, res) => {
     }
 });
 
-requestRouter.get("/reminders/pending", userAuth, async (req, res) => {
+requestRouter.get("/reminders/pending", userAuth, verifyUser, async (req, res) => {
     try {
         const loggedInUser = req.user._id;
         
@@ -325,7 +326,7 @@ requestRouter.get("/reminders/pending", userAuth, async (req, res) => {
     }
 });
 
-requestRouter.post("/reminder/review/:connectionId", userAuth, async (req, res) => {
+requestRouter.post("/reminder/review/:connectionId", userAuth, verifyUser, async (req, res) => {
     try {
 
         const { connectionId } = req.params;
@@ -369,7 +370,7 @@ requestRouter.post("/reminder/review/:connectionId", userAuth, async (req, res) 
     }
 });
 
-requestRouter.get("/request/status/:toUserId" , userAuth, async (req, res) => {
+requestRouter.get("/request/status/:toUserId" , userAuth, verifyUser, async (req, res) => {
     try {
         const { toUserId } = req.params;
         const fromUserId = req.user._id;

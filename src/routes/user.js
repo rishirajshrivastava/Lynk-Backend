@@ -1,14 +1,15 @@
 const express = require('express');
 const userRouter = express.Router();
 const userAuth = require('../middlewares/auth');
+const verifyUser = require('../middlewares/verify');
 const ConnectionRequest = require('../models/connectionRequest');
 const User = require('../models/user')
 const fileUpload = require('express-fileupload');
 
-const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills";
+const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantKids about interests hobbies languages";
 
 //Get all the pending request for the loggedIn user
-userRouter.get("/user/requests/recieved", userAuth, async (req, res) => {
+userRouter.get("/user/requests/recieved", userAuth, verifyUser, async (req, res) => {
     try {
         const loggedInUser = req.user;
         const pendingRequests = await ConnectionRequest.find({
@@ -24,7 +25,7 @@ userRouter.get("/user/requests/recieved", userAuth, async (req, res) => {
     }
 });
 
-userRouter.get("/user/connections", userAuth, async (req,res) =>{
+userRouter.get("/user/connections", userAuth, verifyUser, async (req,res) =>{
     try {
         const loggedInUser = req.user;
         const connectionRequests = await ConnectionRequest.find({
@@ -47,7 +48,7 @@ userRouter.get("/user/connections", userAuth, async (req,res) =>{
     }
 })
 
-userRouter.get("/feed", userAuth,async(req,res) => {
+userRouter.get("/feed", userAuth, verifyUser, async(req,res) => {
     try {
         const page = parseInt(req.query.page) || 1;
         let limit = parseInt(req.query.limit) || 10;
@@ -116,7 +117,7 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload(), async (req, res) 
         const existingPhotoCount = await countUserPhotos(loggedInUser._id);
         const totalPhotosAfterUpload = existingPhotoCount + photoArray.length;
 
-        if (totalPhotosAfterUpload > 6) {
+        if (totalPhotosAfterUpload > 7) {
             return res.status(400).json({
                 message: "Total photos cannot exceed 6",
                 existingPhotos: existingPhotoCount,
@@ -197,6 +198,42 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload(), async (req, res) 
         res.status(400).json({message: err.message})
     }
 })
+
+// Upload selfie for user verification
+userRouter.post("/user/upload-selfie", userAuth, fileUpload(), async (req, res) => {
+    try {
+        if (!req.files || !req.files.selfie) {
+            return res.status(400).json({ message: "No selfie photo uploaded" });
+        }
+
+        const loggedInUser = req.user;
+        const selfie = req.files.selfie;
+        const fileExtension = selfie.name.split('.').pop();
+        
+        // Generate filename with UserVerificationPhoto prefix
+        const filename = `users/${loggedInUser._id}/UserVerificationPhoto-${Date.now()}.${fileExtension}`;
+
+        // Upload to S3
+        const { putObject } = require('../utils/putObject');
+        const { photoUrl, key } = await putObject(selfie.data, filename);
+
+        // Update user's clickedPhoto in database
+        await User.findByIdAndUpdate(
+            loggedInUser._id, 
+            { clickedPhoto: photoUrl }
+        );
+
+        res.json({
+            message: "Selfie uploaded successfully for verification",
+            selfieUrl: photoUrl,
+            key: key,
+            userId: loggedInUser._id
+        });
+    } catch (err) {
+        console.error("Selfie upload error:", err);
+        res.status(400).json({ message: err.message });
+    }
+});
 
 // Delete a specific image
 userRouter.delete("/user/delete-photo", userAuth, async (req, res) => {
@@ -374,5 +411,43 @@ userRouter.get("/user/photos", userAuth, async (req, res) => {
         res.status(400).json({ message: err.message });
     }
 });
+
+userRouter.get("/user-verification-status", userAuth, async (req, res) => {
+    try {
+        const loggedInUser = req.user;
+        const user = await User.findById(loggedInUser._id)
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.json({ userId: loggedInUser._id, isVerified: user.verified,  verificationInProgress: user.verificationInProgress });
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching verification status", error: err.message });
+    }
+})
+
+userRouter.get("/user-selfie-status", userAuth, async (req, res) => {
+    try {
+        const loggedInUser = req.user;
+        const user = await User.findById(loggedInUser._id)
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.json({ userId: loggedInUser._id, selfieStatus: user.clickedPhoto });
+    } catch (err) {
+        res.status(500).json({ message: "Error fetching selfie status", error: err.message });
+    }
+})
+
+userRouter.put("/user-verification-in-progress", userAuth, async (req, res) => {
+    try {
+        const loggedInUser = req.user;
+        const { verificationInProgress } = req.body;
+        await User.findByIdAndUpdate(loggedInUser._id, { verificationInProgress: verificationInProgress });
+        res.json({ message: "Verification in progress updated successfully" });
+    } catch (err) {
+        res.status(500).json({ message: "Error updating verification in progress", error: err.message });
+    }
+})
+
 
 module.exports = userRouter;
