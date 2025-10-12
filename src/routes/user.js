@@ -71,7 +71,8 @@ userRouter.get("/feed", userAuth, verifyUser, async(req,res) => {
         const users = await User.find({
             $and: [
                 {_id: {$nin: Array.from(hideUsersFromFeed)}},
-                {_id : {$ne: loggedInUser._id}}
+                {_id : {$ne: loggedInUser._id}},
+                {verified: true}
             ]
             
         }).select(USER_SAFE_DATA).skip(skip).limit(limit);
