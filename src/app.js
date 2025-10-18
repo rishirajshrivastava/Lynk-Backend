@@ -20,8 +20,9 @@ const profileRouter = require('./routes/profile');
 const requestRouter = require('./routes/request');
 const userRouter = require('./routes/user');
 const chatRouter = require('./routes/chat');
+const emailRouter = require('./routes/sendEmail');
 
-app.use("/", authRouter, profileRouter, requestRouter, userRouter, chatRouter);
+app.use("/", authRouter, profileRouter, requestRouter, userRouter, chatRouter, emailRouter);
 
 const server = http.createServer(app);
 initializeSocket(server);

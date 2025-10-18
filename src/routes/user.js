@@ -6,7 +6,7 @@ const ConnectionRequest = require('../models/connectionRequest');
 const User = require('../models/user')
 const fileUpload = require('express-fileupload');
 
-const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantKids about interests hobbies languages";
+const USER_SAFE_DATA = "firstName lastName email photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantKids about interests hobbies languages";
 
 //Get all the pending request for the loggedIn user
 userRouter.get("/user/requests/recieved", userAuth, verifyUser, async (req, res) => {
@@ -420,7 +420,7 @@ userRouter.get("/user-verification-status", userAuth, async (req, res) => {
         if (!user) {
             return res.status(404).json({ message: "User not found" });
         }
-        res.json({ userId: loggedInUser._id, isVerified: user.verified,  verificationInProgress: user.verificationInProgress });
+        res.json({ userId: loggedInUser._id, emailVerified: user.emailVerified, isVerified: user.verified,  verificationInProgress: user.verificationInProgress });
     } catch (err) {
         res.status(500).json({ message: "Error fetching verification status", error: err.message });
     }

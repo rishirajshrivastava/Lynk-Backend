@@ -6,9 +6,9 @@ const User = require('../models/user');
 const userAuth = require('../middlewares/auth');
 const verifyUser = require('../middlewares/verify');
 
-profileRouter.get("/profile/view", userAuth, verifyUser, async (req,res)=>{
+profileRouter.get("/profile/view", userAuth, async (req,res)=>{
     try{
-        const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages";
+        const USER_SAFE_DATA = "firstName lastName email photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages";
         
         // Extract only safe data from existing user object
         const safeUserData = {};

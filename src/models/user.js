@@ -2,6 +2,18 @@ const mongoose = require('mongoose');
 const validator = require('validator');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
+
+const otpSchema = new mongoose.Schema({
+    otp: {
+        type: String,
+        default: "",
+    },
+    expiresAt: {
+        type: Date,
+        default: null,
+    }
+}, { timestamps: true });
+
 const userSchema = new mongoose.Schema({
     firstName: {
         type: String,
@@ -212,7 +224,13 @@ const userSchema = new mongoose.Schema({
         type: Boolean,
         default: false
     },
-
+    otp: {
+        type: otpSchema,
+        default: {
+            otp: "",
+            expiresAt: ""
+        }
+    },
     ageRange: {
         min: { type: Number, default: 18, min: 18 },
         max: { type: Number, default: 100, max: 100 }
