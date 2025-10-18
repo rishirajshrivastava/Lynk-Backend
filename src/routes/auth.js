@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const User = require('../models/user');
 const validator = require('validator');
 const checkPasswordStrength = require('../utils/checkPasswordStrength');
+const { blockedDomains } = require('../utils/blockedDomains');
 
 authRouter.post("/signup",async (req,res)=>{
     const {
@@ -20,6 +21,17 @@ authRouter.post("/signup",async (req,res)=>{
             error: "Missing required fields",
             details: "First name, email, password, and gender are required"
         });
+    }
+
+    // Check if email domain is blocked
+    if (email && email.includes('@')) {
+        const domain = email.split('@')[1];
+        if (blockedDomains.includes(domain)) {
+            return res.status(400).json({
+                error: "Invalid email",
+                message: "Temporary email domains are not allowed. Please use a valid email address."
+            });
+        }
     }
 
     // Validate skills/interests array length
