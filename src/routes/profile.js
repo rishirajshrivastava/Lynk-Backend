@@ -8,7 +8,7 @@ const verifyUser = require('../middlewares/verify');
 
 profileRouter.get("/profile/view", userAuth, async (req,res)=>{
     try{
-        const USER_SAFE_DATA = "firstName lastName email photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages";
+        const USER_SAFE_DATA = "firstName lastName email photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages _id";
         
         // Extract only safe data from existing user object
         const safeUserData = {};
