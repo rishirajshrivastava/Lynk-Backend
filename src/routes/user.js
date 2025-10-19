@@ -6,7 +6,7 @@ const ConnectionRequest = require('../models/connectionRequest');
 const User = require('../models/user')
 const fileUpload = require('express-fileupload');
 
-const USER_SAFE_DATA = "firstName lastName email photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantKids about interests hobbies languages";
+const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages";
 
 //Get all the pending request for the loggedIn user
 userRouter.get("/user/requests/recieved", userAuth, verifyUser, async (req, res) => {
@@ -15,7 +15,7 @@ userRouter.get("/user/requests/recieved", userAuth, verifyUser, async (req, res)
         const pendingRequests = await ConnectionRequest.find({
             toUserId: loggedInUser._id,
             status: 'interested'
-        }).populate("fromUserId", ["firstName" , "lastName", "age" ,"gender", "about", "skills", "photoUrl"]);
+        }).populate("fromUserId", USER_SAFE_DATA);
         res.json({
             message: "Pending connection requests",
             data: pendingRequests
