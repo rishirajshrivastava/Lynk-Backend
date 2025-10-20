@@ -14,6 +14,15 @@ const otpSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+const reportSchema = new mongoose.Schema({
+    toUserId: {
+        type: mongoose.Schema.Types.ObjectId,
+    },
+    reason: {
+        type: String
+    }
+})
+
 const userSchema = new mongoose.Schema({
     firstName: {
         type: String,
@@ -289,6 +298,10 @@ const userSchema = new mongoose.Schema({
     },
     hasBlocked: {
         type: [String],
+        default: []
+    },
+    hasReported: {
+        type: [reportSchema],
         default: []
     }
 }, {timestamps: true});

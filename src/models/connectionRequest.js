@@ -14,7 +14,7 @@ const connectionRequestSchema = new mongoose.Schema({
         type: String,
         required: true,
         enum:{
-            values: ['ignored', 'interested', 'accepted', 'rejected','special-like'],
+            values: ['ignored', 'interested', 'accepted', 'rejected','special-like','blocked'],
             message: `{VALUE} is not a valid status`
         },
     },
@@ -27,6 +27,10 @@ const connectionRequestSchema = new mongoose.Schema({
         default: false
     },
     reminderReviewed: {
+        type: Boolean,
+        default: false
+    },
+    savedByBoth: {
         type: Boolean,
         default: false
     }

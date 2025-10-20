@@ -10,7 +10,8 @@ const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills";
 
 requestRouter.post("/request/send/:status/:toUserId", userAuth, verifyUser,  async (req, res, next) => {
     try {
-        const fromUserId = req.user._id;
+        const currentUser = req.user;
+        const fromUserId = currentUser._id;
         const toUserId = req.params.toUserId;
         const status = req.params.status;
 
@@ -38,9 +39,30 @@ requestRouter.post("/request/send/:status/:toUserId", userAuth, verifyUser,  asy
             ]
         });
 
-        if(existingRequest) {
-            return res.status(400).json({"message" : "Connection request already exists"});
+        if(existingRequest && existingRequest.status === 'interested' && currentUser.dayLikesCount < 8 && status === 'interested') {
+            existingRequest.status = 'accepted';
+            currentUser.dayLikesCount++;
+            await currentUser.save();
+            await existingRequest.save();
+            return res.status(200).json({"message" : "You have a match"});
         }
+
+        if(existingRequest && existingRequest.status === 'interested' && currentUser.dayLikesCount < 8 && status === 'ignored') {
+            existingRequest.status = 'rejected';
+            await existingRequest.save();
+            return res.status(200).json({"message" : "You had a chance of matching with this user but you missed it"});
+        }
+
+        if(existingRequest && existingRequest.status === 'ignored' && currentUser.dayLikesCount < 8 && status === 'interested') {
+            currentUser.dayLikesCount++;
+            await currentUser.save();
+            return res.status(200).json({"message" : "You have been already rejected by this user"});
+        }
+
+        if(existingRequest && existingRequest.status === 'ignored' && status === 'ignored') {
+            return res.status(200).json({"message" : "You have been already rejected by this user"});
+        }
+
 
         const connectionRequest = new ConnectionRequest({
             fromUserId,
@@ -50,7 +72,6 @@ requestRouter.post("/request/send/:status/:toUserId", userAuth, verifyUser,  asy
         // Handle interested status with validation and counter increment
         if(status === 'interested') {
             // Check dayLikesCount limit before saving connection request
-            const currentUser = await User.findById(fromUserId);
             if (currentUser.dayLikesCount >= 8) {
                 return res.status(400).json({
                     message: "You have reached the maximum like limit per day."
@@ -123,10 +144,9 @@ requestRouter.post("/request/send/special-like/:userId", userAuth, verifyUser, a
     try {
         const fromUserId = req.user._id;
         const toUserId = req.params.userId;
-  
 
         // Check if user has special likes remaining
-        const currentUser = await User.findById(fromUserId);
+        const currentUser = req.user;
         if (currentUser.specialLikeCount >= 3) {
             return res.status(400).json({
                 message: "You have reached the maximum limit of 3 special likes"
@@ -141,10 +161,56 @@ requestRouter.post("/request/send/special-like/:userId", userAuth, verifyUser, a
             ]
         });
 
-        if (existingRequest) {
-            return res.status(400).json({
-                message: "Connection request already exists"
+        if(existingRequest && existingRequest.status === 'interested' && existingRequest.saved === false) {
+            await ConnectionRequest.findByIdAndUpdate(existingRequest._id, {
+                $set: {
+                    fromUserId: fromUserId,
+                    toUserId: toUserId,
+                    status: 'accepted',
+                    saved: true,
+                    reminderSent: false,
+                    reminderReviewed: false,
+                    savedByboth: false
+                }
             });
+            currentUser.specialLikeCount++;
+            await currentUser.save();
+            return res.status(200).json({"message" : "saved this user and it is a match"});
+        }
+
+        if(existingRequest && existingRequest.status === 'ignored' && existingRequest.saved === false) {
+
+            console.log('fromuserid: ', fromUserId);
+            console.log('touserid: ', toUserId);
+            await ConnectionRequest.findByIdAndUpdate(existingRequest._id, {
+                $set: {
+                    fromUserId: fromUserId,
+                    toUserId: toUserId,
+                    status: 'rejected',
+                    saved: true,
+                    reminderSent: false,
+                    reminderReviewed: false,
+                    savedByboth: false
+                }
+            });
+            currentUser.specialLikeCount++;
+            await currentUser.save();
+            return res.status(200).json({"message" : "saving user but you have been already rejected by this user"});
+        }
+
+        if(existingRequest && existingRequest.status === 'interested' && existingRequest.saved === true) {
+            existingRequest.status = 'accepted';
+            await existingRequest.save();
+            const newRequest = new ConnectionRequest({
+                fromUserId: fromUserId, // Note: fromUserId is the target user
+                toUserId: toUserId,  // toUserId is the current user
+                status: 'accepted',  // Use valid status
+                saved: true
+            });
+            await newRequest.save();
+            currentUser.specialLikeCount++;
+            await currentUser.save();
+            return res.status(200).json({"message" : "its a match"});
         }
 
         // Create new connection request with saved: true
@@ -390,6 +456,34 @@ requestRouter.get("/request/status/:toUserId" , userAuth, verifyUser, async (req
             data: {
                 status: connectionRequest.status,
             }
+        });
+    } catch (err) {
+        res.status(500).json({ message: err.message });
+    }
+});
+
+requestRouter.post("/request/block/:toUserId", userAuth, verifyUser, async (req, res) => {
+    try {
+        const { toUserId } = req.params;
+        const fromUser = req.user;
+        const connectionRequest = await ConnectionRequest.findOne({
+            $or: [
+                { fromUserId: fromUser._id, toUserId: toUserId },
+                { fromUserId: toUserId, toUserId: fromUser._id }
+            ]
+        });
+        if (!connectionRequest) {
+            return res.status(404).json({
+                message: "No connection request found",
+                data: null
+            });
+        }
+        connectionRequest.status = 'blocked';
+        fromUser.hasBlocked.push(toUserId);
+        await fromUser.save();
+        await connectionRequest.save();
+        res.json({
+            message: "User blocked successfully",
         });
     } catch (err) {
         res.status(500).json({ message: err.message });

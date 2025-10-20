@@ -36,13 +36,20 @@ userRouter.get("/user/connections", userAuth, verifyUser, async (req,res) =>{
         }).populate("fromUserId" ,USER_SAFE_DATA)
         .populate("toUserId", USER_SAFE_DATA);
 
-        const data = connectionRequests.map((row) =>{
-            if((row.fromUserId._id).toString() === (loggedInUser._id).toString()){
-                return row.toUserId;
+        // Collect only unique users (by _id) from accepted connections
+        const uniqueUsersMap = new Map();
+        connectionRequests.forEach((row) => {
+            const otherUser = (row.fromUserId._id).toString() === (loggedInUser._id).toString()
+                ? row.toUserId
+                : row.fromUserId;
+            const key = otherUser._id.toString();
+            if (!uniqueUsersMap.has(key)) {
+                uniqueUsersMap.set(key, otherUser);
             }
-            return row.fromUserId;
-        })
-        res.json({data : data});
+        });
+
+        const data = Array.from(uniqueUsersMap.values());
+        res.json({data});
     } catch(err) {
         res.status(400).send("Error: " + err.message);
     }
@@ -62,12 +69,20 @@ userRouter.get("/feed", userAuth, verifyUser, async(req,res) => {
                 {toUserId : loggedInUser._id}
             ]
         }).select("fromUserId toUserId")
+        
 
         const hideUsersFromFeed = new Set();
         connectionRequest.forEach(req => {
             hideUsersFromFeed.add(req.fromUserId.toString());
             hideUsersFromFeed.add(req.toUserId.toString());
-        })
+        });
+        
+        // Add blocked users to the hide list
+        if (loggedInUser.hasBlocked && Array.isArray(loggedInUser.hasBlocked)) {
+            loggedInUser.hasBlocked.forEach(blockedUserId => {
+                hideUsersFromFeed.add(blockedUserId.toString());
+            });
+        }
         const users = await User.find({
             $and: [
                 {_id: {$nin: Array.from(hideUsersFromFeed)}},
