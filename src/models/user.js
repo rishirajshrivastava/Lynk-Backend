@@ -20,6 +20,10 @@ const reportSchema = new mongoose.Schema({
     },
     reason: {
         type: String
+    },
+    details: {
+        type: String,
+        default: ""
     }
 })
 

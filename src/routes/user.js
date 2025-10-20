@@ -8,6 +8,40 @@ const fileUpload = require('express-fileupload');
 
 const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages";
 
+userRouter.post("/user/report/:toUserId", userAuth, verifyUser, async (req, res) => {
+    try {
+        const fromUser = req.user;
+        const { toUserId } = req.params;
+        const { reason, details } = req.body || {};
+
+        if (!toUserId) {
+            return res.status(400).json({ message: "toUserId is required" });
+        }
+
+        // 1) Find existing connection requests in either direction and mark all as blocked
+        const blockResult = await ConnectionRequest.updateMany(
+            {
+                $or: [
+                    { fromUserId: fromUser._id, toUserId },
+                    { fromUserId: toUserId, toUserId: fromUser._id }
+                ]
+            },
+            { $set: { status: "blocked" } }
+        );
+
+        await User.findByIdAndUpdate(toUserId, { $inc: { reportedCount: 1 } });
+
+        const reportEntry = { toUserId, reason: reason || "", details: details || "" };
+        await User.findByIdAndUpdate(fromUser._id, { $push: { hasReported: reportEntry } });
+
+        return res.json({
+            message: "User reported successfully",
+        });
+    } catch (err) {
+        return res.status(400).json({ message: err.message });
+    }
+});
+
 //Get all the pending request for the loggedIn user
 userRouter.get("/user/requests/recieved", userAuth, verifyUser, async (req, res) => {
     try {
