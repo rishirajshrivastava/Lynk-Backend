@@ -6,7 +6,7 @@ const ConnectionRequest = require('../models/connectionRequest');
 const User = require('../models/user')
 const fileUpload = require('express-fileupload');
 
-const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages";
+const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages interestedIn relationshipStatus lookingFor bodyType ethnicity religion politicalViews";
 
 userRouter.post("/user/report/:toUserId", userAuth, verifyUser, async (req, res) => {
     try {
@@ -50,9 +50,24 @@ userRouter.get("/user/requests/recieved", userAuth, verifyUser, async (req, res)
             toUserId: loggedInUser._id,
             status: 'interested'
         }).populate("fromUserId", USER_SAFE_DATA);
+
+        // Transform arrays to return only first element for lookingFor and interestedIn
+        const transformedRequests = pendingRequests.map(request => {
+            const requestObj = request.toObject();
+            if (requestObj.fromUserId) {
+                if (requestObj.fromUserId.lookingFor && Array.isArray(requestObj.fromUserId.lookingFor) && requestObj.fromUserId.lookingFor.length > 0) {
+                    requestObj.fromUserId.lookingFor = requestObj.fromUserId.lookingFor[0];
+                }
+                if (requestObj.fromUserId.interestedIn && Array.isArray(requestObj.fromUserId.interestedIn) && requestObj.fromUserId.interestedIn.length > 0) {
+                    requestObj.fromUserId.interestedIn = requestObj.fromUserId.interestedIn[0];
+                }
+            }
+            return requestObj;
+        });
+
         res.json({
             message: "Pending connection requests",
-            data: pendingRequests
+            data: transformedRequests
         });
     } catch (err) {
         res.status(500).send("Error: " + err.message);
@@ -125,7 +140,19 @@ userRouter.get("/feed", userAuth, verifyUser, async(req,res) => {
             ]
             
         }).select(USER_SAFE_DATA).skip(skip).limit(limit);
-        res.json({data: users});
+
+        // Transform arrays to return only first element for lookingFor and interestedIn
+        const transformedUsers = users.map(user => {
+            const userObj = user.toObject();
+            if (userObj.lookingFor && Array.isArray(userObj.lookingFor) && userObj.lookingFor.length > 0) {
+                userObj.lookingFor = userObj.lookingFor[0];
+            }
+            if (userObj.interestedIn && Array.isArray(userObj.interestedIn) && userObj.interestedIn.length > 0) {
+                userObj.interestedIn = userObj.interestedIn[0];
+            }
+            return userObj;
+        });
+        res.json({data: transformedUsers});
     } catch(err) {
         res.status(400).json({message: err.message})
     }
