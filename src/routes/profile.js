@@ -8,7 +8,7 @@ const verifyUser = require('../middlewares/verify');
 
 profileRouter.get("/profile/view", userAuth, async (req,res)=>{
     try{
-        const USER_SAFE_DATA = "firstName lastName email photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages _id";
+        const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages interestedIn relationshipStatus lookingFor bodyType ethnicity religion politicalViews";
         
         // Extract only safe data from existing user object
         const safeUserData = {};
@@ -19,10 +19,27 @@ profileRouter.get("/profile/view", userAuth, async (req,res)=>{
                 safeUserData[field] = req.user[field];
             }
         });
+
+        // Transform arrays to return only first element for lookingFor and interestedIn
+        const userObj = req.user.toObject ? req.user.toObject() : req.user;
+        if (userObj.lookingFor && Array.isArray(userObj.lookingFor) && userObj.lookingFor.length > 0) {
+            userObj.lookingFor = userObj.lookingFor[0];
+        }
+        if (userObj.interestedIn && Array.isArray(userObj.interestedIn) && userObj.interestedIn.length > 0) {
+            userObj.interestedIn = userObj.interestedIn[0];
+        }
+
+        // Extract only safe data from transformed user object
+        const transformedUser = {};
+        fields.forEach(field => {
+            if (userObj[field] !== undefined) {
+                transformedUser[field] = userObj[field];
+            }
+        });
         
         res.json({
             message: "Profile retrieved successfully",
-            user: safeUserData
+            user: transformedUser
         });
     } catch (err) {
         res.status(500).send("ERROR : " + err.message);
