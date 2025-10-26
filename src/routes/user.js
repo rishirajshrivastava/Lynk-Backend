@@ -526,5 +526,156 @@ userRouter.put("/user-verification-in-progress", userAuth, async (req, res) => {
     }
 })
 
+userRouter.put("/user/password-reset-mail-verification", async (req, res) => {
+    try {
+        const { email } = req.body;
+        
+        if (!email) {
+            return res.status(400).json({ message: "Email is required" });
+        }
+
+        const user = await User.findOne({ email: email });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if existing OTP is still valid
+        if (user.otp && user.otp.otp && user.otp.expiresAt) {
+            const now = new Date();
+            const expiresAt = new Date(user.otp.expiresAt);
+            
+            if (now < expiresAt) {
+                // OTP is still valid, don't send new email
+                const timeLeft = Math.ceil((expiresAt - now) / 1000); // seconds remaining
+                const minutesLeft = Math.ceil(timeLeft / 60);
+                
+                return res.status(400).json({
+                    message: "OTP already sent. Please use the existing OTP or wait for it to expire.",
+                    timeLeft: timeLeft,
+                    minutesLeft: minutesLeft,
+                    expiresAt: expiresAt.toISOString(),
+                    canResendAfter: expiresAt.toISOString()
+                });
+            }
+        }
+
+        // Generate 6-digit OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+        // Send email first
+        const { sendEmail } = require('../utils/emailService');
+        const subject = "Password Reset Verification - Lynk";
+        const text = `Hello ${user.firstName},\n\nYou have requested to reset your password. Please use the following verification code:\n\nVerification Code: ${otp}\n\nThis code will expire in 2 minutes.\n\nIf you did not request this password reset, please ignore this email.\n\nBest regards,\nThe Lynk Team`;
+
+        await sendEmail(email, subject, text);
+
+        // Only if email is sent successfully, then do DB operations
+        const expiresAt = new Date(Date.now() + 2 * 60 * 1000); // 10 minutes from now
+
+        // Update user's OTP field directly
+        user.otp = {
+            otp: otp,
+            expiresAt: expiresAt
+        };
+        user.allowPasswordReset = true;
+        await user.save();
+
+        res.json({
+            message: "Password reset verification email sent successfully",
+            email: email,
+        });
+    } catch (err) {
+        console.error("Password reset email error:", err);
+        res.status(500).json({ message: "Error sending password reset verification email", error: err.message });
+    }
+})
+
+// Verify OTP for password reset
+userRouter.post("/user/verify-password-reset-otp", async (req, res) => {
+    try {
+        const { email, otp } = req.body;
+        
+        if (!email || !otp) {
+            return res.status(400).json({ message: "Email and OTP are required" });
+        }
+
+        const user = await User.findOne({ email: email });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
+        // Check if OTP exists
+        if (!user.otp || !user.otp.otp || !user.otp.expiresAt) {
+            return res.status(400).json({ 
+                message: "No OTP found. Please request a new password reset.",
+                valid: false
+            });
+        }
+
+        // Check if OTP has expired
+        const now = new Date();
+        const expiresAt = new Date(user.otp.expiresAt);
+        
+        if (now >= expiresAt) {
+            return res.status(400).json({ 
+                message: "OTP has expired. Please request a new password reset.",
+                valid: false,
+                expired: true
+            });
+        }
+
+        // Check if OTP matches
+        if (user.otp.otp !== otp) {
+            return res.status(400).json({ 
+                message: "Invalid OTP. Please check and try again.",
+                valid: false
+            });
+        }
+
+        // OTP is valid
+        user.otp.otp = "";
+        user.otp.expiresAt = null;
+        await user.save();
+        res.json({
+            message: "OTP verified successfully",
+        });
+
+    } catch (err) {
+        console.error("OTP verification error:", err);
+        res.status(500).json({ message: "Error verifying OTP", error: err.message });
+    }
+})
+
+userRouter.post("/user/password-reset", async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required" });
+        }
+
+        const user = await User.findOne({ email: email });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        
+        if (!user.allowPasswordReset) {
+            return res.status(400).json({ message: "Password reset not allowed. Please verify OTP first." });
+        }
+        
+        // Hash the new password before storing
+        const bcrypt = require('bcrypt');
+        const passwordHash = await bcrypt.hash(password, 10);
+        user.password = passwordHash;
+        user.allowPasswordReset = false;
+        await user.save();
+        
+        res.json({ message: "Password reset successfully" });
+    } catch (err) {
+        console.error("Password reset error:", err);
+        res.status(500).json({ message: "Error resetting password", error: err.message });
+    }
+})
+
 
 module.exports = userRouter;

@@ -307,6 +307,10 @@ const userSchema = new mongoose.Schema({
     hasReported: {
         type: [reportSchema],
         default: []
+    },
+    allowPasswordReset: {
+        type: Boolean,
+        default: false
     }
 }, {timestamps: true});
 
@@ -315,7 +319,7 @@ userSchema.index({ dayLikesCount: 1, _id: 1 });
 
 userSchema.methods.getJWT = async function() {
     const user = this;
-    const token = await jwt.sign({_id: user._id},"Dev@1608",{ expiresIn: "7d"});
+    const token = await jwt.sign({_id: user._id},process.env.JWT_SECRET,{ expiresIn: "7d"});
     return token;
 };
 
