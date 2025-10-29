@@ -167,11 +167,13 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload({
     responseOnLimit: "File size exceeds the 5MB limit or too many files"
 }), async (req, res) => {
     try {
+        console.log("started");
         if (!req.files) {
             return res.status(400).json({ message: "No photos uploaded" });
         }
 
         const loggedInUser = req.user;
+        console.log("user :", loggedInUser);
         
         let photos;
         if (req.files.photos) {
@@ -241,14 +243,17 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload({
 
         for (let i = 0; i < photoArray.length; i++) {
             try {
+                console.log("inside for loop");
                 const photo = photoArray[i];
                 const fileExtension = photo.name.split('.').pop();
                 
                 let filename = `users/${loggedInUser._id}/profile-${Date.now()}.${fileExtension}`;
+                console.log("filename :", filename);
 
                 const { putObject } = require('../utils/putObject');
                 const { photoUrl, key } = await putObject(photo.data, filename);
-                
+                console.log("photoUrl :", photoUrl);
+                console.log("key :", key);
                 uploadResults.push({
                     index: i,
                     originalName: photo.name,
@@ -256,6 +261,7 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload({
                     key: key,
                     success: true
                 });
+                console.log("uploadResults :", uploadResults)
             } catch (error) {
                 console.error(`Error uploading photo ${i}:`, error);
                 errors.push({
