@@ -158,7 +158,14 @@ userRouter.get("/feed", userAuth, verifyUser, async(req,res) => {
     }
 })
 
-userRouter.post("/user/upload-photos", userAuth, fileUpload(), async (req, res) => {
+userRouter.post("/user/upload-photos", userAuth, fileUpload({
+    limits: { 
+        fileSize: 5 * 1024 * 1024, // 5MB per file
+        files: 6 // Maximum 6 files
+    },
+    abortOnLimit: true,
+    responseOnLimit: "File size exceeds the 5MB limit or too many files"
+}), async (req, res) => {
     try {
         if (!req.files) {
             return res.status(400).json({ message: "No photos uploaded" });
@@ -176,6 +183,31 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload(), async (req, res) 
         }
         
         const photoArray = Array.isArray(photos) ? photos : [photos];
+        
+        // Check file size (5MB per photo)
+        const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB in bytes
+        const MAX_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB total (6 photos * 5MB)
+        let totalSize = 0;
+        
+        for (let i = 0; i < photoArray.length; i++) {
+            if (photoArray[i].size > MAX_FILE_SIZE) {
+                return res.status(400).json({
+                    message: `Photo ${i + 1} exceeds maximum file size of 5MB`,
+                    fileName: photoArray[i].name,
+                    fileSize: photoArray[i].size,
+                    maxSize: MAX_FILE_SIZE
+                });
+            }
+            totalSize += photoArray[i].size;
+        }
+        
+        if (totalSize > MAX_TOTAL_SIZE) {
+            return res.status(400).json({
+                message: "Total upload size exceeds 30MB limit",
+                totalSize: totalSize,
+                maxTotalSize: MAX_TOTAL_SIZE
+            });
+        }
         
         if (photoArray.length > 6) {
             return res.status(400).json({
@@ -277,7 +309,11 @@ userRouter.post("/user/upload-photos", userAuth, fileUpload(), async (req, res) 
 })
 
 // Upload selfie for user verification
-userRouter.post("/user/upload-selfie", userAuth, fileUpload(), async (req, res) => {
+userRouter.post("/user/upload-selfie", userAuth, fileUpload({
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    abortOnLimit: true,
+    responseOnLimit: "File size exceeds the 5MB limit"
+}), async (req, res) => {
     try {
         if (!req.files || !req.files.selfie) {
             return res.status(400).json({ message: "No selfie photo uploaded" });
@@ -406,7 +442,11 @@ userRouter.delete("/user/delete-all-photos", userAuth, async (req, res) => {
     }
 });
 
-userRouter.put("/user/edit-photo", userAuth, fileUpload(), async (req, res) => {
+userRouter.put("/user/edit-photo", userAuth, fileUpload({
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+    abortOnLimit: true,
+    responseOnLimit: "File size exceeds the 5MB limit"
+}), async (req, res) => {
     try {
         const { oldPhotoUrl } = req.body;
         const loggedInUser = req.user;
@@ -669,6 +709,13 @@ userRouter.post("/user/password-reset", async (req, res) => {
         user.password = passwordHash;
         user.allowPasswordReset = false;
         await user.save();
+        
+        // Send confirmation email
+        const { sendEmail } = require('../utils/emailService');
+        const subject = "Password Reset Successful - Lynk";
+        const text = `Hello ${user.firstName},\n\nYour password has been successfully reset.\n\nIf you did not make this change, please contact our support team immediately.\n\nBest regards,\nThe Lynk Team`;
+        
+        await sendEmail(email, subject, text);
         
         res.json({ message: "Password reset successfully" });
     } catch (err) {
