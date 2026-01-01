@@ -4,6 +4,7 @@ const userAuth = require('../middlewares/auth');
 const verifyUser = require('../middlewares/verify');
 const ConnectionRequest = require('../models/connectionRequest');
 const User = require('../models/user')
+const { Chat } = require('../models/chat');
 const fileUpload = require('express-fileupload');
 
 const USER_SAFE_DATA = "firstName lastName photoUrl age gender about skills height weight location occupation education smoking drinking exercise diet hasKids wantsKids about interests hobbies languages interestedIn relationshipStatus lookingFor bodyType ethnicity religion politicalViews";
@@ -33,6 +34,15 @@ userRouter.post("/user/report/:toUserId", userAuth, verifyUser, async (req, res)
 
         const reportEntry = { toUserId, reason: reason || "", details: details || "" };
         await User.findByIdAndUpdate(fromUser._id, { $push: { hasReported: reportEntry } });
+
+        const chat = await Chat.findOne({
+          participants: { $all: [fromUser._id, toUserId] },
+        });
+
+        if (chat) {
+          await Chat.findByIdAndDelete(chat._id);
+        }
+
 
         return res.json({
             message: "User reported successfully",

@@ -1,6 +1,7 @@
 const express = require('express');
 const requestRouter = express.Router();
 const ConnectionRequest = require('../models/connectionRequest');
+const {Chat} = require('../models/chat');
 const User = require('../models/user');
 
 const userAuth = require('../middlewares/auth');
@@ -481,6 +482,13 @@ requestRouter.post("/request/block/:toUserId", userAuth, verifyUser, async (req,
         connectionRequest.status = 'blocked';
         fromUser.hasBlocked.push(toUserId);
         await fromUser.save();
+        const chat = await Chat.findOne({
+            participants: { $all: [fromUser._id, toUserId] }
+        });
+
+        if (chat) {
+            await Chat.findByIdAndDelete(chat._id);
+        }
         await connectionRequest.save();
         res.json({
             message: "User blocked successfully",
